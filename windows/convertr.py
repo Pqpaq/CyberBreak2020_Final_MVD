@@ -6,7 +6,7 @@ from docx import Document
 from odf import text, teletype
 from odf.opendocument import load, OpenDocumentText
 from tkinter import *
-from tkinter.filedialog import askopenfilename, askdirectory
+from tkinter.filedialog import askopenfilename, askdirectory, asksaveasfilename
 from tkinter import messagebox as mb
 
 morph = pymorphy2.MorphAnalyzer()
@@ -14,7 +14,8 @@ Dictionary_After1_Error = {"Ко нему": "К нему", "ко нему": "к 
                            "Ко ним": "К ним", "ко ним": "к ним",
                            "Ко ему": "К нему", "ко ему": "к нему", "Ко ей": "К ней", "ко ей": "к ней",
                            "Ко им": "К ним", "ко им": "к ним", "К ей": "К ней", "к ей": "к ней",
-                           "У их": "У них", "у их": "у них",
+                           "У их": "У них", "у их": "у них", "При ей": "При ней", "при ей": "при ней",
+                           "При ему": "При нем", "при ему": "при нем",
                            }
 
 def conv():
@@ -92,16 +93,22 @@ def conv():
 
             textline = ''
             for k in range(0, len(offers)):
+                stroka = ""
                 if offers[k].startswith("-"):
                     continue
                 if re.findall(r'(«.{1,}»)', offers[k]):
-                    string = re.findall(r'(«.{1,}»)', offers[k])
+                    kav = re.findall(r'(«[^«»]{1,}»)', offers[k])
+                    for i in kav:
+                        stroka += i
+                    stroka = stroka.split()
                 elif re.findall(r'(".{1,}")', offers[k]):
-                    string = re.findall(r'(".{1,}")', offers[k])
-                else:
-                    string = re.findall(r'\w+', offers[k])
+                    kav = re.findall(r'("[^"]{1,}")', offers[k])
+                    for i in kav:
+                        stroka += i
+                    stroka = stroka.split()
+                string = re.findall(r'\w+', offers[k])
                 for i in string:
-                    if i.startswith('\"') or i.startswith('«'):
+                    if i.startswith('\"') or i.startswith('«') or i in stroka:
                         continue
                     wd = ''
                     word = morph.parse(i)[0]
@@ -188,20 +195,22 @@ def conv():
             offers = re.split(r'\.', my_text.get(1.0, END))
             textline = ''
             for k in range(0, len(offers)):
+                stroka = ""
                 if offers[k].startswith("-") or offers[k].startswith("\n-"):
                     continue
                 if re.findall(r'(«.{1,}»)', offers[k]):
-                    string = re.findall(r'(«.{1,}»)', offers[k])
-                elif re.findall(r'(\n«.{1,}»)', offers[k]):
-                    string = re.findall(r'(\n«.{1,}»)', offers[k])
+                    kav = re.findall(r'(«[^«»]{1,}»)', offers[k])
+                    for i in kav:
+                        stroka += i
+                    stroka = stroka.split()
                 elif re.findall(r'(".{1,}")', offers[k]):
-                    string = re.findall(r'(".{1,}")', offers[k])
-                elif re.findall(r'(\n".{1,}")', offers[k]):
-                    string = re.findall(r'(\n".{1,}")', offers[k])
-                else:
-                    string = re.findall(r'\w+', offers[k])
+                    kav = re.findall(r'("[^"]{1,}")', offers[k])
+                    for i in kav:
+                        stroka += i
+                    stroka = stroka.split()
+                string = re.findall(r'\w+', offers[k])
                 for i in string:
-                    if i.startswith('\"') or i.startswith('«') or i.startswith('\n'):
+                    if i.startswith('\"') or i.startswith('«') or i.startswith('\n') or i in stroka:
                         continue
                     wd = ''
                     word = morph.parse(i)[0]
@@ -273,29 +282,49 @@ def conv():
             my_text2.delete(1.0, END)
 
             for i in range(0, len(file)):
-                string1 = re.findall(r'\w+', file[i])
-                string2 = re.findall(r'\w+', file2[i])
+                string1 = file[i].split()
+                string2 = file2[i].split()
+                offset_1 = ""
+                offset_2 = ""
                 for j in range(0, len(string1)):
                     if string1[j] == string2[j]:
                         my_text.insert(END, string1[j] + ' ')
                         my_text2.insert(END, string2[j] + ' ')
+                        offset_1 += string1[j] + ' '
+                        offset_2 += string2[j] + ' '
                     else:
                         if j != len(string1):
                             my_text.insert(END, string1[j] + ' ')
                             my_text2.insert(END, string2[j] + ' ')
+                            offset_1 += string1[j] + ' '
+                            offset_2 += string2[j] + ' '
                         else:
                             my_text.insert(END, string1[j] + '. ')
                             my_text2.insert(END, string2[j] + '. ')
-                        sym = len(string1[j])
-                        sym2 = len(string2[j])
-                        my_text.tag_add("Было", my_text.index(END + "-" + str(sym)+'c'), my_text.index(END))
-                        my_text2.tag_add("Стало", my_text2.index(END + "-" + str(sym2)+'c'), my_text2.index(END))
-                        my_text.tag_config("Было", background="red", foreground="black")
-                        my_text2.tag_config("Стало", background="yellow", foreground="blue")
+                            offset_1 += string1[j] + '. '
+                            offset_2 += string2[j] + '. '
+
+                        word1 = string1[j]
+                        offset1 = '+%dc' % len(word1)
+                        word2 = string2[j]
+                        offset2 = '+%dc' % len(word2)
+
+                        offset_11 = '+%dc' % (len(offset_1)-1-len(word1))
+                        offset_22 = '+%dc' % (len(offset_2)-1-len(word2))
+                        pos1 = str(float(i+1))+offset_11
+                        pos2 = str(float(i+1))+offset_22
+
+                        pos_start1 = my_text.search(word1, pos1, END)
+                        pos_start2 = my_text2.search(word2, pos2, END)
+
+                        pos_end1 = pos_start1 + offset1
+                        pos_end2 = pos_start2 + offset2
+
+                        my_text.tag_add("Было", pos_start1, pos_end1)
+                        my_text2.tag_add("Стало", pos_start2, pos_end2)
                 my_text.insert(END, '\n')
                 my_text2.insert(END, '\n')
             Count += 1
-
 
 def add_file():
     global filepath
@@ -383,14 +412,41 @@ def exit_conv(event):
         window.destroy()
     #sys.exit() не работает но пусть пока будет
 
+def save_file():
+    name = asksaveasfilename(defaultextension=("Text Files", "*.txt"))
+    if name == '':
+        return
+    else:
+        if os.path.split(name)[1].endswith(".docx") or os.path.split(name)[1].endswith(".odt"):
+            if os.path.split(name)[1].endswith(".docx"):
+                if os.path.isfile(name) is False:
+                    document = docx.Document()
+                    document.save(os.path.split(name)[1])
+                file = Document(name)
+                text2save = str(my_text2.get(1.0, END))
+                file.add_paragraph(text2save)
+            else:
+                if os.path.isfile(name) is False:
+                    document = OpenDocumentText()
+                    document.save(os.path.split(name)[1])
+                file = load(name)
+                text2save = my_text2.get(1.0, END)
+                file.text.addElement(text.P(text=text2save))
+            file.save(os.path.split(name)[1])
+        else:
+            file = open(name, 'w')
+            text2save = str(my_text2.get(1.0, END))
+            file.write(text2save)
+            file.close()
+
+
 #Полезные константы
 filepath = ""
 
 # основные настройки
 window = Tk()
 window.title("Конвертер")
-window.geometry("1200x600")
-# window.iconphoto(False, PhotoImage(file="F:\Jija Lichnoe\Python\Проекты\Разные штуки\CyberBreak2020_Final_MVD\icon.png"))
+window.geometry("1200x650")
 # радиобокс для выбора гендера
 sex = IntVar()  # храним как int, можно как bool, тогда меняем на BooleanVar()
 sex.set(0)  # по умолчанию будет мужской ибо value = 0 у мужского рода и в sex.set в скобках 0
@@ -432,20 +488,25 @@ my_text2 = Text(window, width=62, height=30)
 my_text2.pack(pady=5, padx=5)
 my_text2.place(relx=0.55, rely=0.2)
 
+my_text.tag_config("Было", background="red", foreground="black")
+my_text2.tag_config("Стало", background="yellow", foreground="blue")
+
 # кнопушки
 btn_clear = Button(window, text="Очистить поле ввода", command=clear_text)
 btn_conv = Button(window, text="ПРЕОБРАЗОВАТЬ", command=conv)
 btn_upload = Button(window, text="Загрузить файл", command=add_file)
 btn_clear2 = Button(window, text="Очистить поле вывода", command=clear_text2)
+btn_save = Button(window, text="Сохранить файл", command=save_file)
 
 #выравнивание кнопушек
 btn_clear.grid(row=0, column=0)
 btn_clear2.grid(row=0, column=1)
 btn_upload.grid(row=0, column=2)
 btn_conv.grid(row=0, column=3)
-male.grid(row=0, column=4)
-female.grid(row=0, column=5)
-ch_box.grid(row=0, column=6)
+btn_save.grid(row=0, column=4)
+male.grid(row=0, column=5)
+female.grid(row=0, column=6)
+ch_box.grid(row=0, column=7)
 
 
 #горячие клавиши
